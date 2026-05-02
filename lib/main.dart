@@ -1,12 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 import 'bloc/news_bloc.dart';
 import 'data/datasources/news_remote_data_source.dart';
 import 'data/repositories/news_repository.dart';
 import 'presentation/screens/news_screen.dart';
 
-void main() {
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   final repository = NewsRepository(remoteDataSource: NewsRemoteDataSource());
 
   runApp(NewsApp(repository: repository));

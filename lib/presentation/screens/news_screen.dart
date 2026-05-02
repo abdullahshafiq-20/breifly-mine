@@ -15,10 +15,78 @@ class NewsScreen extends StatefulWidget {
 }
 
 class _NewsScreenState extends State<NewsScreen> {
+  final TextEditingController _promptController = TextEditingController();
+
   @override
   void initState() {
     super.initState();
     context.read<NewsBloc>().add(LoadNews());
+  }
+
+  @override
+  void dispose() {
+    _promptController.dispose();
+    super.dispose();
+  }
+
+  void _submitPrompt() {
+    final prompt = _promptController.text.trim();
+    context.read<NewsBloc>().add(
+          LoadNews(prompt: prompt.isEmpty ? null : prompt),
+        );
+    FocusScope.of(context).unfocus();
+  }
+
+  Widget _buildPromptField() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+      child: TextField(
+        controller: _promptController,
+        textInputAction: TextInputAction.search,
+        onSubmitted: (_) => _submitPrompt(),
+        decoration: InputDecoration(
+          hintText: 'Ask for news (e.g., AI chips this week)',
+          filled: true,
+          fillColor: Colors.grey.shade900.withAlpha(160),
+          prefixIcon: const Icon(Icons.search),
+          suffixIcon: IconButton(
+            onPressed: _submitPrompt,
+            icon: const Icon(Icons.arrow_forward),
+          ),
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(16),
+            borderSide: BorderSide.none,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildChips(List<Map<String, dynamic>> categories) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: List.generate(categories.length, (i) {
+            final category = categories[i];
+            final leftPadding = i == 0 ? 16.0 : 16.0;
+            return Padding(
+              padding: EdgeInsets.only(left: leftPadding),
+              child: Chip(
+                label: Text(
+                  category['label'],
+                  style: TextStyle(
+                    color: category['textColor'] ?? Colors.white,
+                  ),
+                ),
+                backgroundColor: category['color'],
+              ),
+            );
+          }),
+        ),
+      ),
+    );
   }
 
   @override
@@ -72,28 +140,46 @@ class _NewsScreenState extends State<NewsScreen> {
       ),
       body: BlocBuilder<NewsBloc, NewsState>(
         builder: (context, state) {
+          final List<Map<String, dynamic>> categories = [
+            {
+              'label': 'Tech',
+              'color': Colors.lime,
+              'textColor': Colors.black,
+            },
+            {'label': 'Sports'},
+            {'label': 'Politics'},
+            {'label': 'Crypto'},
+            {'label': 'Design'},
+          ];
+
           if (state is NewsLoading || state is NewsInitial) {
-            return const Center(child: CircularProgressIndicator());
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildPromptField(),
+                _buildChips(categories),
+                const SizedBox(height: 16),
+                const Center(child: CircularProgressIndicator()),
+              ],
+            );
           }
 
           if (state is NewsError) {
-            return Center(child: Text('Error: ${state.message}'));
+            return ListView(
+              padding: EdgeInsets.zero,
+              children: [
+                _buildPromptField(),
+                _buildChips(categories),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text('Error: ${state.message}'),
+                ),
+              ],
+            );
           }
 
           if (state is NewsLoaded) {
             final news = state.news;
-
-            final List<Map<String, dynamic>> categories = [
-              {
-                'label': 'Tech',
-                'color': Colors.lime,
-                'textColor': Colors.black,
-              },
-              {'label': 'Sports'},
-              {'label': 'Politics'},
-              {'label': 'Crypto'},
-              {'label': 'Design'},
-            ];
 
             return RefreshIndicator(
               onRefresh: () async {
@@ -102,43 +188,21 @@ class _NewsScreenState extends State<NewsScreen> {
               },
               child: ListView.builder(
                 padding: EdgeInsets.zero,
-                itemCount: news.length + 2, // 1 for chips row, 1 for spacing
+                itemCount: news.length + 3, // prompt, chips row, spacing
                 itemBuilder: (context, index) {
                   if (index == 0) {
-                    // Chips row at top of the list
-                    return Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: List.generate(categories.length, (i) {
-                            final category = categories[i];
-                            final leftPadding = i == 0 ? 16.0 : 16.0;
-                            return Padding(
-                              padding: EdgeInsets.only(left: leftPadding),
-                              child: Chip(
-                                label: Text(
-                                  category['label'],
-                                  style: TextStyle(
-                                    color:
-                                        category['textColor'] ?? Colors.white,
-                                  ),
-                                ),
-                                backgroundColor: category['color'],
-                              ),
-                            );
-                          }),
-                        ),
-                      ),
-                    );
+                    return _buildPromptField();
                   } else if (index == 1) {
+                    // Chips row under the prompt
+                    return _buildChips(categories);
+                  } else if (index == 2) {
                     // Spacing after chips row
                     return const SizedBox(height: 8);
                   } else {
                     // News cards
                     return Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: NewsCard(item: news[index - 2]),
+                      child: NewsCard(item: news[index - 3]),
                     );
                   }
                 },
